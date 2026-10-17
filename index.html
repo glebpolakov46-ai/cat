@@ -105,7 +105,7 @@ footer{padding:20px;text-align:center;font-size:14px;color:var(--t);opacity:.7}
 
 <section id="map"><div class="w">
   <h2>Карта</h2>
-  <p>Адрес офиса: <strong>г. Химки, ул. Маяковская, 5</strong>. Введите свой адрес, и я покажу маршрут до офиса.</p>
+  <p>Адрес офиса: <strong>г. Химки, ул. Московская, 5</strong>. Введите свой адрес, и я покажу маршрут до офиса.</p>
   <form class="rform" id="route-form" novalidate>
     <input id="route-from" type="text" autocomplete="street-address" aria-label="Ваш адрес" placeholder="Ваш адрес, например: Москва, Ленинградский проспект 10">
     <button class="btn" type="submit" id="route-btn">Построить маршрут</button>
@@ -126,7 +126,7 @@ footer{padding:20px;text-align:center;font-size:14px;color:var(--t);opacity:.7}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (function(){
-var OFFICE={address:'Маяковская 5, Химки',query:'Маяковская 5, Химки, Московская область',coords:null}; // при необходимости укажите точные координаты: [широта, долгота]
+var OFFICE={address:'г. Химки, ул. Московская, 5',queries:['Химки, улица Московская, 5','Московская улица 5, Химки','Московская 5, Химки, Московская область'],coords:null}; // при необходимости укажите точные координаты: [широта, долгота]
 var st=document.getElementById('route-status'),btn=document.getElementById('route-btn'),officeLL=null,routeLayer=null,userMarker=null,map;
 function say(m,bad){st.textContent=m;st.className=bad?'err':'';}
 if(typeof L==='undefined'){say('Не удалось загрузить карту. Проверьте подключение к интернету.',true);return;}
@@ -145,9 +145,13 @@ function placeOffice(ll){
   map.setView(ll,16);
 }
 if(OFFICE.coords){placeOffice(OFFICE.coords);}
-else{geocode(OFFICE.query).then(function(r){
-  if(r)placeOffice(r.ll);else say('Не удалось определить положение офиса на карте.',true);
-}).catch(function(){say('Не удалось загрузить положение офиса. Обновите страницу.',true);});}
+else{
+  var qs=OFFICE.queries,qi=0;
+  (function next(){
+    if(qi>=qs.length){say('Не удалось определить положение офиса на карте.',true);return;}
+    geocode(qs[qi++]).then(function(r){if(r)placeOffice(r.ll);else next();}).catch(function(){next();});
+  })();
+}
 document.getElementById('route-form').addEventListener('submit',function(e){
   e.preventDefault();
   var q=document.getElementById('route-from').value.trim(),from;
