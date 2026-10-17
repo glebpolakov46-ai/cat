@@ -126,7 +126,7 @@ footer{padding:20px;text-align:center;font-size:14px;color:var(--t);opacity:.7}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (function(){
-var OFFICE={address:'г. Химки, ул. Московская, 5',queries:['Химки, улица Московская, 5','Московская улица 5, Химки','Московская 5, Химки, Московская область'],coords:null}; // при необходимости укажите точные координаты: [широта, долгота]
+var OFFICE={address:'г. Химки, ул. Московская, 5',queries:['Химки, улица Московская, 5','Московская улица 5, Химки','Московская 5, Химки, Московская область'],coords:55.892494, 37.449115}; // при необходимости укажите точные координаты: [широта, долгота]
 var st=document.getElementById('route-status'),btn=document.getElementById('route-btn'),officeLL=null,routeLayer=null,userMarker=null,map;
 function say(m,bad){st.textContent=m;st.className=bad?'err':'';}
 if(typeof L==='undefined'){say('Не удалось загрузить карту. Проверьте подключение к интернету.',true);return;}
