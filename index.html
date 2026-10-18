@@ -107,6 +107,21 @@ nav{animation:drop .7s ease both}
 .pt{white-space:pre-line;margin:8px 0 12px}
 .pb a{color:var(--vd);font-weight:600}
 @media (prefers-reduced-motion:reduce){.post{animation:none}}
+/* слайдер блога */
+.track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;margin-top:20px;border-radius:14px;-webkit-overflow-scrolling:touch}
+.track::-webkit-scrollbar{display:none}
+.track .post{flex:0 0 100%;scroll-snap-align:start;margin:0;min-width:0}
+.track .pe{flex:0 0 100%;margin:0;padding:24px 0}
+.pt.clamp{display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical;overflow:hidden}
+.more{display:block;background:none;border:0;padding:0 0 10px;color:var(--vd);font:inherit;font-weight:600;cursor:pointer}
+.sl-ctl{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:18px}
+.sl-btn{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--vd);font-size:26px;line-height:1;cursor:pointer;transition:box-shadow .25s ease,border-color .25s ease,transform .2s ease}
+.sl-btn:hover{border-color:var(--v);box-shadow:0 0 14px rgba(111,190,150,.6);transform:scale(1.07)}
+.dots{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:60%}
+.dot{width:10px;height:10px;padding:0;border-radius:50%;border:0;background:var(--line);cursor:pointer;transition:background .25s ease,transform .25s ease}
+.dot.on{background:var(--v);transform:scale(1.35)}
+.cnt{font-size:15px;font-weight:600;color:var(--vd);min-width:52px;text-align:center}
+@media (prefers-reduced-motion:reduce){.track{scroll-behavior:auto}}
 </style>
 </head>
 <body>
@@ -166,8 +181,13 @@ nav{animation:drop .7s ease both}
 <section id="blog"><div class="w">
   <h2>Блог</h2>
   <p>Небольшие заметки о психологии и КПТ. Они публикуются из моего Telegram-канала.</p>
-  <div id="blog-list"><p class="pe">Загружаю записи…</p></div>
-  <button class="btn" type="button" id="blog-more" style="display:none">Показать ещё</button>
+  <div class="track" id="blog-list" tabindex="0" aria-label="Записи блога"><p class="pe">Загружаю записи…</p></div>
+  <div class="sl-ctl" id="blog-ctl" style="display:none">
+    <button class="sl-btn" id="blog-prev" type="button" aria-label="Предыдущая запись">‹</button>
+    <div class="dots" id="blog-dots"></div>
+    <span class="cnt" id="blog-count" aria-live="polite"></span>
+    <button class="sl-btn" id="blog-next" type="button" aria-label="Следующая запись">›</button>
+  </div>
 </div></section>
 
 <section id="map"><div class="w">
@@ -308,10 +328,11 @@ try{
 <script>
 (function(){
 try{
-  var box=document.getElementById('blog-list'),more=document.getElementById('blog-more');
-  if(!box||!more)return;
-  var all=[],shown=0,STEP=4;
-  function msg(t){box.innerHTML='';var p=document.createElement('p');p.className='pe';p.textContent=t;box.appendChild(p);}
+  var box=document.getElementById('blog-list'),ctl=document.getElementById('blog-ctl'),dots=document.getElementById('blog-dots'),cnt=document.getElementById('blog-count'),prev=document.getElementById('blog-prev'),next=document.getElementById('blog-next');
+  if(!box||!ctl)return;
+  var n=0,cur=0,LIMIT=24,tick=false;
+  var calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function msg(t){box.innerHTML='';var p=document.createElement('p');p.className='pe';p.textContent=t;box.appendChild(p);ctl.style.display='none';}
   function fmt(t){try{return new Date(t*1000).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});}catch(e){return '';}}
   function card(p){
     var a=document.createElement('article');a.className='post';
@@ -322,21 +343,47 @@ try{
     }
     var b=document.createElement('div');b.className='pb';
     var d=document.createElement('div');d.className='pd';d.textContent=fmt(p.date);b.appendChild(d);
-    if(p.text){var t=document.createElement('p');t.className='pt';t.textContent=p.text;b.appendChild(t);}
+    if(p.text){
+      var t=document.createElement('p');t.className='pt';t.textContent=p.text;b.appendChild(t);
+      if(p.text.length>420){
+        t.classList.add('clamp');
+        var x=document.createElement('button');x.type='button';x.className='more';x.textContent='Читать полностью';
+        x.addEventListener('click',function(){var c=t.classList.toggle('clamp');x.textContent=c?'Читать полностью':'Свернуть';});
+        b.appendChild(x);
+      }
+    }
     if(p.link&&/^https:\/\/t\.me\//.test(p.link)){var l=document.createElement('a');l.href=p.link;l.target='_blank';l.rel='noopener';l.textContent='Читать в Telegram →';b.appendChild(l);}
     a.appendChild(b);return a;
   }
-  function render(){
-    all.slice(shown,shown+STEP).forEach(function(p){box.appendChild(card(p));});
-    shown=Math.min(all.length,shown+STEP);
-    more.style.display=shown<all.length?'inline-block':'none';
+  function w(){return box.clientWidth||1;}
+  function go(i,instant){box.scrollTo({left:i*w(),behavior:(calm||instant)?'auto':'smooth'});}
+  function update(){
+    cur=Math.max(0,Math.min(n-1,Math.round(box.scrollLeft/w())));
+    cnt.textContent=(cur+1)+' / '+n;
+    [].forEach.call(dots.children,function(d,i){d.classList.toggle('on',i===cur);});
   }
+  function build(list){
+    n=Math.min(list.length,LIMIT);
+    box.innerHTML='';
+    list.slice(0,n).forEach(function(p){box.appendChild(card(p));});
+    if(n<2){ctl.style.display='none';return;}
+    ctl.style.display='flex';dots.innerHTML='';
+    if(n<=10){for(var i=0;i<n;i++){(function(i){var d=document.createElement('button');d.type='button';d.className='dot';d.setAttribute('aria-label','Запись '+(i+1));d.addEventListener('click',function(){go(i);});dots.appendChild(d);})(i);}}
+    update();
+  }
+  box.addEventListener('scroll',function(){if(tick)return;tick=true;requestAnimationFrame(function(){tick=false;update();});});
+  prev.addEventListener('click',function(){go((cur-1+n)%n);});
+  next.addEventListener('click',function(){go((cur+1)%n);});
+  box.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'){e.preventDefault();go((cur+1)%n);}
+    if(e.key==='ArrowLeft'){e.preventDefault();go((cur-1+n)%n);}
+  });
+  window.addEventListener('resize',function(){if(n)go(cur,true);});
   fetch('blog/posts.json',{cache:'no-cache'}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){
-    all=(d&&d.posts)||[];
-    if(!all.length){msg('Скоро здесь появятся первые записи.');return;}
-    box.innerHTML='';render();
+    var list=(d&&d.posts)||[];
+    if(!list.length){msg('Скоро здесь появятся первые записи.');return;}
+    build(list);
   }).catch(function(){msg('Скоро здесь появятся первые записи.');});
-  more.addEventListener('click',render);
 }catch(e){}
 })();
 </script>
